@@ -1,12 +1,12 @@
 {
   "files": {
-    "main.css": "/stock-application/static/css/main.4efb37a3.css",
-    "main.js": "/stock-application/static/js/main.c1077903.js",
-    "static/js/206.05b29826.chunk.js": "/stock-application/static/js/206.05b29826.chunk.js",
+    "main.css": "/stock-application/static/css/main.2fb0bc9d.css",
+    "main.js": "/stock-application/static/js/main.39cc713a.js",
+    "static/js/206.8fa834cf.chunk.js": "/stock-application/static/js/206.8fa834cf.chunk.js",
     "index.html": "/stock-application/index.html"
   },
   "entrypoints": [
-    "static/css/main.4efb37a3.css",
-    "static/js/main.c1077903.js"
+    "static/css/main.2fb0bc9d.css",
+    "static/js/main.39cc713a.js"
   ]
 }
