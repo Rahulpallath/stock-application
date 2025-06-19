@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Search, Home, Briefcase, Activity, User, ArrowUpRight, ArrowDownRight, AlertCircle, Loader } from 'lucide-react';
+import { TrendingUp, TrendingDown, Search, Home, Briefcase, Activity, User, ArrowUpRight, ArrowDownRight, AlertCircle, Loader, LogOut } from 'lucide-react';
+import { Amplify } from 'aws-amplify';
+import { signOut } from 'aws-amplify/auth';
+import { Authenticator } from '@aws-amplify/ui-react';
+import '@aws-amplify/ui-react/styles.css';
+import awsExports from './aws-exports';
+
+// Configure Amplify
+Amplify.configure(awsExports);
 
 // Finnhub API configuration
-const FINNHUB_API_KEY = 'd19jet9r01qmm7tvj180d19jet9r01qmm7tvj18g'; // Replace with your API key
+const FINNHUB_API_KEY = process.env.REACT_APP_FINNHUB_API_KEY || 'YOUR_FINNHUB_API_KEY';
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 
-// Popular stocks list
-const POPULAR_STOCKS = [
+// Popular stocks list - Start with fewer stocks for faster loading
+const INITIAL_STOCKS = [
   { symbol: 'AAPL', name: 'Apple Inc.' },
   { symbol: 'MSFT', name: 'Microsoft Corporation' },
   { symbol: 'GOOGL', name: 'Alphabet Inc.' },
@@ -14,10 +22,12 @@ const POPULAR_STOCKS = [
   { symbol: 'NVDA', name: 'NVIDIA Corporation' },
   { symbol: 'META', name: 'Meta Platforms Inc.' },
   { symbol: 'TSLA', name: 'Tesla Inc.' },
-  { symbol: 'BRK.B', name: 'Berkshire Hathaway' },
   { symbol: 'JPM', name: 'JPMorgan Chase' },
   { symbol: 'V', name: 'Visa Inc.' },
-  { symbol: 'JNJ', name: 'Johnson & Johnson' },
+  { symbol: 'JNJ', name: 'Johnson & Johnson' }
+];
+
+const ADDITIONAL_STOCKS = [
   { symbol: 'WMT', name: 'Walmart Inc.' },
   { symbol: 'PG', name: 'Procter & Gamble' },
   { symbol: 'UNH', name: 'UnitedHealth Group' },
@@ -26,31 +36,109 @@ const POPULAR_STOCKS = [
   { symbol: 'DIS', name: 'The Walt Disney Company' },
   { symbol: 'ADBE', name: 'Adobe Inc.' },
   { symbol: 'CRM', name: 'Salesforce Inc.' },
-  { symbol: 'NFLX', name: 'Netflix Inc.' }
+  { symbol: 'NFLX', name: 'Netflix Inc.' },
+  { symbol: 'PFE', name: 'Pfizer Inc.' }
 ];
+
+const POPULAR_STOCKS = [...INITIAL_STOCKS, ...ADDITIONAL_STOCKS];
 
 // WebSocket connection for real-time updates
 let socket = null;
 
-const StockTradingSimulator = () => {
-  const [user, setUser] = useState({
-    name: 'Demo User',
-    cash: 10000,
-    portfolioValue: 0,
-    totalValue: 10000
+// Helper functions for user-specific storage
+const loadUserData = (userId, key, defaultValue) => {
+  try {
+    const storageKey = `stockSim_${userId}_${key}`;
+    const item = window.localStorage.getItem(storageKey);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch (error) {
+    console.error(`Error loading ${key} from localStorage:`, error);
+    return defaultValue;
+  }
+};
+
+const saveUserData = (userId, key, value) => {
+  try {
+    const storageKey = `stockSim_${userId}_${key}`;
+    window.localStorage.setItem(storageKey, JSON.stringify(value));
+  } catch (error) {
+    console.error(`Error saving ${key} to localStorage:`, error);
+  }
+};
+
+const StockTradingSimulatorAuth = () => {
+  return (
+    <Authenticator>
+      {({ signOut, user }) => (
+        <MainApp user={user} signOut={signOut} />
+      )}
+    </Authenticator>
+  );
+};
+
+const MainApp = ({ user, signOut }) => {
+  const userId = user.username;
+  
+  // Load saved data from localStorage with user-specific keys
+  const [userData, setUserData] = useState(() => {
+    const initialData = loadUserData(userId, 'user', {
+      name: user.attributes?.email || user.username,
+      cash: 10000,
+      portfolioValue: 0,
+      totalValue: 10000
+    });
+    return initialData;
   });
   
-  const [portfolio, setPortfolio] = useState({});
+  const [portfolio, setPortfolio] = useState(() => 
+    loadUserData(userId, 'portfolio', {})
+  );
   const [stockData, setStockData] = useState({});
   const [selectedStock, setSelectedStock] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [orderType, setOrderType] = useState('buy');
   const [orderQuantity, setOrderQuantity] = useState('');
-  const [transactions, setTransactions] = useState([]);
+  const [transactions, setTransactions] = useState(() => 
+    loadUserData(userId, 'transactions', [])
+  );
   const [activeTab, setActiveTab] = useState('home');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [apiKeyMissing, setApiKeyMissing] = useState(false);
+
+  // Initialize user data on first login
+  useEffect(() => {
+    const initializeUserData = () => {
+      const storedUser = loadUserData(userId, 'user', null);
+      if (!storedUser) {
+        const newUserData = {
+          name: user.attributes?.email || user.username,
+          cash: 10000,
+          portfolioValue: 0,
+          totalValue: 10000,
+          joinedDate: new Date().toISOString()
+        };
+        setUserData(newUserData);
+        saveUserData(userId, 'user', newUserData);
+      }
+    };
+    initializeUserData();
+  }, [userId, user]);
+
+  // Save user data whenever it changes
+  useEffect(() => {
+    saveUserData(userId, 'user', userData);
+  }, [userId, userData]);
+
+  // Save portfolio whenever it changes
+  useEffect(() => {
+    saveUserData(userId, 'portfolio', portfolio);
+  }, [userId, portfolio]);
+
+  // Save transactions whenever they change
+  useEffect(() => {
+    saveUserData(userId, 'transactions', transactions);
+  }, [userId, transactions]);
 
   // Fetch stock quote from Finnhub
   const fetchStockQuote = async (symbol) => {
@@ -65,7 +153,6 @@ const StockTradingSimulator = () => {
       
       const data = await response.json();
       
-      // Check if we got valid data
       if (data.c === 0 && data.h === 0 && data.l === 0) {
         throw new Error('Invalid API response');
       }
@@ -86,31 +173,14 @@ const StockTradingSimulator = () => {
     }
   };
 
-  // Fetch company profile from Finnhub
-  const fetchCompanyProfile = async (symbol) => {
-    try {
-      const response = await fetch(
-        `${FINNHUB_BASE_URL}/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`
-      );
-      
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      console.error(`Error fetching profile for ${symbol}:`, error);
-      return null;
-    }
-  };
-
   // Initialize stock data with batch requests
   const initializeStockData = async () => {
     setLoading(true);
     setError(null);
 
-    // Check if API key is set
-    if (FINNHUB_API_KEY === 'YOUR_FINNHUB_API_KEY') {
+    if (!FINNHUB_API_KEY || FINNHUB_API_KEY === 'YOUR_FINNHUB_API_KEY') {
       setApiKeyMissing(true);
       setLoading(false);
-      // Use mock data when no API key
       const mockData = {};
       POPULAR_STOCKS.forEach(stock => {
         const basePrice = 50 + Math.random() * 450;
@@ -135,15 +205,12 @@ const StockTradingSimulator = () => {
     try {
       const stockInfo = {};
       
-      // Fetch data for each stock (be mindful of rate limits)
-      // Finnhub free tier: 60 API calls/minute
-      for (let i = 0; i < POPULAR_STOCKS.length; i++) {
-        const stock = POPULAR_STOCKS[i];
+      for (let i = 0; i < INITIAL_STOCKS.length; i++) {
+        const stock = INITIAL_STOCKS[i];
         
         try {
-          // Add delay to avoid rate limiting (1 second between requests)
           if (i > 0) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 500));
           }
           
           const quote = await fetchStockQuote(stock.symbol);
@@ -162,7 +229,6 @@ const StockTradingSimulator = () => {
           };
         } catch (error) {
           console.error(`Failed to fetch ${stock.symbol}:`, error);
-          // Use fallback data for failed requests
           stockInfo[stock.symbol] = {
             symbol: stock.symbol,
             name: stock.name,
@@ -179,88 +245,50 @@ const StockTradingSimulator = () => {
       
       setStockData(stockInfo);
       setLoading(false);
+      
+      setTimeout(async () => {
+        for (let i = 0; i < ADDITIONAL_STOCKS.length; i++) {
+          const stock = ADDITIONAL_STOCKS[i];
+          
+          try {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const quote = await fetchStockQuote(stock.symbol);
+            
+            setStockData(prev => ({
+              ...prev,
+              [stock.symbol]: {
+                symbol: stock.symbol,
+                name: stock.name,
+                price: quote.currentPrice,
+                previousClose: quote.previousClose,
+                change: quote.change,
+                changePercent: quote.percentChange,
+                high: quote.highPrice,
+                low: quote.lowPrice,
+                open: quote.openPrice,
+                timestamp: quote.timestamp
+              }
+            }));
+          } catch (error) {
+            console.error(`Failed to fetch ${stock.symbol}:`, error);
+          }
+        }
+      }, 100);
+      
     } catch (error) {
       setError('Failed to load stock data. Please try again later.');
       setLoading(false);
     }
   };
 
-  // Set up WebSocket for real-time updates
-  const setupWebSocket = () => {
-    if (FINNHUB_API_KEY === 'YOUR_FINNHUB_API_KEY') return;
-
-    socket = new WebSocket(`wss://ws.finnhub.io?token=${FINNHUB_API_KEY}`);
-    
-    socket.addEventListener('open', function (event) {
-      console.log('WebSocket connected');
-      // Subscribe to stocks
-      POPULAR_STOCKS.forEach(stock => {
-        socket.send(JSON.stringify({'type':'subscribe', 'symbol': stock.symbol}));
-      });
-    });
-
-    socket.addEventListener('message', function (event) {
-      const message = JSON.parse(event.data);
-      if (message.type === 'trade' && message.data) {
-        // Update stock prices with real-time data
-        const updates = {};
-        message.data.forEach(trade => {
-          updates[trade.s] = trade.p; // s = symbol, p = price
-        });
-        
-        setStockData(prev => {
-          const newData = { ...prev };
-          Object.entries(updates).forEach(([symbol, price]) => {
-            if (newData[symbol]) {
-              const oldPrice = newData[symbol].price;
-              newData[symbol] = {
-                ...newData[symbol],
-                price: price,
-                change: price - newData[symbol].previousClose,
-                changePercent: ((price - newData[symbol].previousClose) / newData[symbol].previousClose) * 100
-              };
-            }
-          });
-          return newData;
-        });
-      }
-    });
-
-    socket.addEventListener('error', function (event) {
-      console.error('WebSocket error:', event);
-    });
-
-    socket.addEventListener('close', function (event) {
-      console.log('WebSocket disconnected');
-      // Attempt to reconnect after 5 seconds
-      setTimeout(setupWebSocket, 5000);
-    });
-  };
-
   // Initialize data on component mount
   useEffect(() => {
     initializeStockData();
-    
-    // Set up WebSocket after initial data load
-    const timer = setTimeout(() => {
-      setupWebSocket();
-    }, 5000);
-
-    return () => {
-      clearTimeout(timer);
-      if (socket) {
-        POPULAR_STOCKS.forEach(stock => {
-          socket.send(JSON.stringify({'type':'unsubscribe', 'symbol': stock.symbol}));
-        });
-        socket.close();
-      }
-    };
   }, []);
 
-  // Fallback: Update prices periodically if WebSocket fails
+  // Update prices periodically
   useEffect(() => {
-    if (FINNHUB_API_KEY === 'YOUR_FINNHUB_API_KEY') {
-      // Simulate price updates for demo mode
+    if (!FINNHUB_API_KEY || FINNHUB_API_KEY === 'YOUR_FINNHUB_API_KEY') {
       const interval = setInterval(() => {
         setStockData(prev => {
           const newData = { ...prev };
@@ -278,7 +306,7 @@ const StockTradingSimulator = () => {
           });
           return newData;
         });
-      }, 3000);
+      }, 5000);
       
       return () => clearInterval(interval);
     }
@@ -293,7 +321,7 @@ const StockTradingSimulator = () => {
       }
     });
     
-    setUser(prev => ({
+    setUserData(prev => ({
       ...prev,
       portfolioValue: totalPortfolioValue,
       totalValue: prev.cash + totalPortfolioValue
@@ -308,8 +336,8 @@ const StockTradingSimulator = () => {
     const totalCost = stock.price * quantity;
 
     if (orderType === 'buy') {
-      if (user.cash >= totalCost) {
-        setUser(prev => ({ ...prev, cash: prev.cash - totalCost }));
+      if (userData?.cash >= totalCost) {
+        setUserData(prev => ({ ...prev, cash: prev.cash - totalCost }));
         setPortfolio(prev => ({
           ...prev,
           [selectedStock]: (prev[selectedStock] || 0) + quantity
@@ -329,7 +357,7 @@ const StockTradingSimulator = () => {
       }
     } else {
       if (portfolio[selectedStock] >= quantity) {
-        setUser(prev => ({ ...prev, cash: prev.cash + totalCost }));
+        setUserData(prev => ({ ...prev, cash: prev.cash + totalCost }));
         setPortfolio(prev => ({
           ...prev,
           [selectedStock]: prev[selectedStock] - quantity
@@ -357,6 +385,76 @@ const StockTradingSimulator = () => {
     stock.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const resetAllData = () => {
+    if (window.confirm('Are you sure you want to reset all data? This will clear your portfolio, transactions, and reset your cash to $10,000.')) {
+      const defaultUser = {
+        name: user.attributes?.email || user.username,
+        cash: 10000,
+        portfolioValue: 0,
+        totalValue: 10000
+      };
+      
+      setUserData(defaultUser);
+      setPortfolio({});
+      setTransactions([]);
+      
+      localStorage.removeItem(`stockSim_${userId}_user`);
+      localStorage.removeItem(`stockSim_${userId}_portfolio`);
+      localStorage.removeItem(`stockSim_${userId}_transactions`);
+      
+      alert('All data has been reset!');
+    }
+  };
+
+  const exportData = () => {
+    const data = {
+      userData,
+      portfolio,
+      transactions,
+      exportDate: new Date().toISOString(),
+      username: user.username
+    };
+    
+    const dataStr = JSON.stringify(data, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `stock-sim-${user.username}-${new Date().toISOString().split('T')[0]}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
+
+  const importData = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          
+          if (data.userData) setUserData(data.userData);
+          if (data.portfolio) setPortfolio(data.portfolio);
+          if (data.transactions) setTransactions(data.transactions);
+          
+          alert('Data imported successfully!');
+        } catch (error) {
+          alert('Error importing data. Please check the file format.');
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   const renderHome = () => (
     <div className="space-y-6">
       {apiKeyMissing && (
@@ -369,7 +467,8 @@ const StockTradingSimulator = () => {
               </p>
               <ol className="text-sm text-yellow-700 mt-2 list-decimal list-inside">
                 <li>Get a free API key from <a href="https://finnhub.io" target="_blank" rel="noopener noreferrer" className="underline">finnhub.io</a></li>
-                <li>Replace 'YOUR_FINNHUB_API_KEY' in the code with your API key</li>
+                <li>Add your API key to the .env file</li>
+                <li>Restart the app with npm start</li>
               </ol>
             </div>
           </div>
@@ -377,19 +476,19 @@ const StockTradingSimulator = () => {
       )}
 
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-6 text-white">
-        <h2 className="text-2xl font-bold mb-2">Welcome back, {user.name}!</h2>
+        <h2 className="text-2xl font-bold mb-2">Welcome back, {userData?.name || 'User'}!</h2>
         <div className="grid grid-cols-3 gap-4 mt-4">
           <div>
             <p className="text-blue-100">Total Value</p>
-            <p className="text-3xl font-bold">${user.totalValue.toFixed(2)}</p>
+            <p className="text-3xl font-bold">${(userData?.totalValue || 0).toFixed(2)}</p>
           </div>
           <div>
             <p className="text-blue-100">Cash Available</p>
-            <p className="text-2xl font-semibold">${user.cash.toFixed(2)}</p>
+            <p className="text-2xl font-semibold">${(userData?.cash || 0).toFixed(2)}</p>
           </div>
           <div>
             <p className="text-blue-100">Portfolio Value</p>
-            <p className="text-2xl font-semibold">${user.portfolioValue.toFixed(2)}</p>
+            <p className="text-2xl font-semibold">${(userData?.portfolioValue || 0).toFixed(2)}</p>
           </div>
         </div>
       </div>
@@ -462,7 +561,7 @@ const StockTradingSimulator = () => {
                 .reduce((sum, t) => sum + t.total, 0);
               
               const profit = value - totalCost;
-              const profitPercent = (profit / totalCost) * 100;
+              const profitPercent = totalCost > 0 ? (profit / totalCost) * 100 : 0;
               
               return (
                 <div key={symbol} className="p-4 hover:bg-gray-50">
@@ -612,7 +711,7 @@ const StockTradingSimulator = () => {
                   </div>
                   <div className="flex justify-between mb-4">
                     <span className="text-gray-600">Available Cash</span>
-                    <span className="font-semibold">${user.cash.toFixed(2)}</span>
+                    <span className="font-semibold">${(userData?.cash || 0).toFixed(2)}</span>
                   </div>
                   
                   <button
@@ -644,8 +743,54 @@ const StockTradingSimulator = () => {
           <div className="flex justify-between items-center">
             <h1 className="text-2xl font-bold text-gray-900">StockSim</h1>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Cash: ${user.cash.toFixed(2)}</span>
-              <span className="text-sm font-semibold">Total: ${user.totalValue.toFixed(2)}</span>
+              <span className="text-sm text-gray-600">User: {user.username}</span>
+              <span className="text-sm text-gray-600">Cash: ${(userData?.cash || 0).toFixed(2)}</span>
+              <span className="text-sm font-semibold">Total: ${(userData?.totalValue || 0).toFixed(2)}</span>
+              
+              {/* Settings Dropdown */}
+              <div className="relative group">
+                <button className="p-2 rounded hover:bg-gray-100">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+                
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <div className="py-1">
+                    <button
+                      onClick={exportData}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Export Data
+                    </button>
+                    <label className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">
+                      Import Data
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={importData}
+                        className="hidden"
+                      />
+                    </label>
+                    <hr className="my-1" />
+                    <button
+                      onClick={resetAllData}
+                      className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                    >
+                      Reset All Data
+                    </button>
+                    <hr className="my-1" />
+                    <button
+                      onClick={handleSignOut}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                    >
+                      <LogOut size={16} className="mr-2" />
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -688,4 +833,4 @@ const StockTradingSimulator = () => {
   );
 };
 
-export default StockTradingSimulator;
+export default StockTradingSimulatorAuth;

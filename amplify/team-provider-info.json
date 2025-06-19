@@ -1,0 +1,26 @@
+{
+  "dev": {
+    "awscloudformation": {
+      "AuthRoleName": "amplify-stocktradingsimulato-dev-0157e-authRole",
+      "UnauthRoleArn": "arn:aws:iam::564714323613:role/amplify-stocktradingsimulato-dev-0157e-unauthRole",
+      "AuthRoleArn": "arn:aws:iam::564714323613:role/amplify-stocktradingsimulato-dev-0157e-authRole",
+      "Region": "us-east-2",
+      "DeploymentBucketName": "amplify-stocktradingsimulato-dev-0157e-deployment",
+      "UnauthRoleName": "amplify-stocktradingsimulato-dev-0157e-unauthRole",
+      "StackName": "amplify-stocktradingsimulato-dev-0157e",
+      "StackId": "arn:aws:cloudformation:us-east-2:564714323613:stack/amplify-stocktradingsimulato-dev-0157e/5f8a1030-4cc4-11f0-bfa6-060408d16c05",
+      "AmplifyAppId": "dfi69wt422dkk"
+    },
+    "categories": {
+      "auth": {
+        "stocktradingsimulato4f8f725d": {}
+      },
+      "hosting": {
+        "amplifyhosting": {
+          "appId": "dfi69wt422dkk",
+          "type": "manual"
+        }
+      }
+    }
+  }
+}
