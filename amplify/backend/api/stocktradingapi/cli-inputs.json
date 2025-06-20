@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "paths": {
+    "/portfolio": {
+      "name": "/portfolio",
+      "lambdaFunction": "stocktradingfunction",
+      "permissions": {
+        "setting": "protected",
+        "auth": [
+          "read",
+          "update"
+        ],
+        "guest": [
+          "create",
+          "read",
+          "update",
+          "delete"
+        ]
+      }
+    }
+  }
+}

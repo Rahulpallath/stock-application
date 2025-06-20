@@ -1,0 +1,14 @@
+{
+  "resourceName": "stocktradingdb",
+  "tableName": "UserPortfolio",
+  "partitionKey": {
+    "fieldName": "userId",
+    "fieldType": "string"
+  },
+  "sortKey": {
+    "fieldName": "dataType",
+    "fieldType": "string"
+  },
+  "gsi": [],
+  "triggerFunctions": []
+}

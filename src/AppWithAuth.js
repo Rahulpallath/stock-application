@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Search, Home, Briefcase, Activity, User, ArrowUpRight, ArrowDownRight, AlertCircle, Loader, LogOut } from 'lucide-react';
 import { Amplify } from 'aws-amplify';
+import { get, post } from 'aws-amplify/api';
 import { signOut } from 'aws-amplify/auth';
 import { Authenticator } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
@@ -9,11 +10,55 @@ import awsExports from './aws-exports';
 // Configure Amplify
 Amplify.configure(awsExports);
 
+// API configuration
+const apiName = 'stocktradingapi';
+const path = '/portfolio';
+
+// Portfolio Service Functions
+const saveUserData = async (userId, dataType, data) => {
+  try {
+    const body = {
+      userId,
+      dataType,
+      data: JSON.stringify(data),
+      updatedAt: new Date().toISOString()
+    };
+    
+    await post({
+      apiName: apiName,
+      path: path,
+      options: {
+        body: body
+      }
+    }).response;
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving data:', error);
+    return { success: false, error };
+  }
+};
+
+const getUserData = async (userId, dataType) => {
+  try {
+    const response = await get({
+      apiName: apiName,
+      path: `${path}/${userId}/${dataType}`
+    }).response;
+    
+    const data = await response.body.json();
+    return data.data ? JSON.parse(data.data) : null;
+  } catch (error) {
+    console.error('Error getting data:', error);
+    return null;
+  }
+};
+
 // Finnhub API configuration
 const FINNHUB_API_KEY = process.env.REACT_APP_FINNHUB_API_KEY || 'YOUR_FINNHUB_API_KEY';
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 
-// Popular stocks list - Start with fewer stocks for faster loading
+// Popular stocks list
 const INITIAL_STOCKS = [
   { symbol: 'AAPL', name: 'Apple Inc.' },
   { symbol: 'MSFT', name: 'Microsoft Corporation' },
@@ -42,30 +87,7 @@ const ADDITIONAL_STOCKS = [
 
 const POPULAR_STOCKS = [...INITIAL_STOCKS, ...ADDITIONAL_STOCKS];
 
-// WebSocket connection for real-time updates
-let socket = null;
-
-// Helper functions for user-specific storage
-const loadUserData = (userId, key, defaultValue) => {
-  try {
-    const storageKey = `stockSim_${userId}_${key}`;
-    const item = window.localStorage.getItem(storageKey);
-    return item ? JSON.parse(item) : defaultValue;
-  } catch (error) {
-    console.error(`Error loading ${key} from localStorage:`, error);
-    return defaultValue;
-  }
-};
-
-const saveUserData = (userId, key, value) => {
-  try {
-    const storageKey = `stockSim_${userId}_${key}`;
-    window.localStorage.setItem(storageKey, JSON.stringify(value));
-  } catch (error) {
-    console.error(`Error saving ${key} to localStorage:`, error);
-  }
-};
-
+// Main component wrapper with authentication
 const StockTradingSimulatorAuth = () => {
   return (
     <Authenticator>
@@ -76,69 +98,72 @@ const StockTradingSimulatorAuth = () => {
   );
 };
 
+// Main App Component
 const MainApp = ({ user, signOut }) => {
   const userId = user.username;
   
-  // Load saved data from localStorage with user-specific keys
-  const [userData, setUserData] = useState(() => {
-    const initialData = loadUserData(userId, 'user', {
-      name: user.attributes?.email || user.username,
-      cash: 10000,
-      portfolioValue: 0,
-      totalValue: 10000
-    });
-    return initialData;
-  });
-  
-  const [portfolio, setPortfolio] = useState(() => 
-    loadUserData(userId, 'portfolio', {})
-  );
+  // All state declarations should be inside the component
+  const [userData, setUserData] = useState(null);
+  const [portfolio, setPortfolio] = useState({});
+  const [transactions, setTransactions] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [stockData, setStockData] = useState({});
   const [selectedStock, setSelectedStock] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [orderType, setOrderType] = useState('buy');
   const [orderQuantity, setOrderQuantity] = useState('');
-  const [transactions, setTransactions] = useState(() => 
-    loadUserData(userId, 'transactions', [])
-  );
   const [activeTab, setActiveTab] = useState('home');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [apiKeyMissing, setApiKeyMissing] = useState(false);
 
-  // Initialize user data on first login
+  // Load user data from DynamoDB on mount
   useEffect(() => {
-    const initializeUserData = () => {
-      const storedUser = loadUserData(userId, 'user', null);
-      if (!storedUser) {
-        const newUserData = {
+    const fetchAllData = async () => {
+      try {
+        const info = await getUserData(userId, 'USER_INFO');
+        const port = await getUserData(userId, 'PORTFOLIO');
+        const txns = await getUserData(userId, 'TRANSACTIONS');
+
+        setUserData(info || {
           name: user.attributes?.email || user.username,
           cash: 10000,
           portfolioValue: 0,
-          totalValue: 10000,
-          joinedDate: new Date().toISOString()
-        };
-        setUserData(newUserData);
-        saveUserData(userId, 'user', newUserData);
+          totalValue: 10000
+        });
+
+        setPortfolio(port || {});
+        setTransactions(txns || []);
+      } catch (err) {
+        console.error('Error loading user data:', err);
+      } finally {
+        setIsLoading(false);
       }
     };
-    initializeUserData();
+
+    fetchAllData();
   }, [userId, user]);
 
-  // Save user data whenever it changes
+  // Save user info when it changes
   useEffect(() => {
-    saveUserData(userId, 'user', userData);
-  }, [userId, userData]);
+    if (userData && !isLoading) {
+      saveUserData(userId, 'USER_INFO', userData).catch(console.error);
+    }
+  }, [userData, userId, isLoading]);
 
-  // Save portfolio whenever it changes
+  // Save portfolio when it changes
   useEffect(() => {
-    saveUserData(userId, 'portfolio', portfolio);
-  }, [userId, portfolio]);
+    if (!isLoading) {
+      saveUserData(userId, 'PORTFOLIO', portfolio).catch(console.error);
+    }
+  }, [portfolio, userId, isLoading]);
 
-  // Save transactions whenever they change
+  // Save transactions when they change
   useEffect(() => {
-    saveUserData(userId, 'transactions', transactions);
-  }, [userId, transactions]);
+    if (!isLoading) {
+      saveUserData(userId, 'TRANSACTIONS', transactions).catch(console.error);
+    }
+  }, [transactions, userId, isLoading]);
 
   // Fetch stock quote from Finnhub
   const fetchStockQuote = async (symbol) => {
@@ -156,7 +181,7 @@ const MainApp = ({ user, signOut }) => {
       if (data.c === 0 && data.h === 0 && data.l === 0) {
         throw new Error('Invalid API response');
       }
-      
+
       return {
         currentPrice: data.c,
         change: data.d,
@@ -246,6 +271,7 @@ const MainApp = ({ user, signOut }) => {
       setStockData(stockInfo);
       setLoading(false);
       
+      // Load additional stocks in background
       setTimeout(async () => {
         for (let i = 0; i < ADDITIONAL_STOCKS.length; i++) {
           const stock = ADDITIONAL_STOCKS[i];
@@ -314,6 +340,8 @@ const MainApp = ({ user, signOut }) => {
 
   // Update portfolio value
   useEffect(() => {
+    if (!userData) return;
+    
     let totalPortfolioValue = 0;
     Object.entries(portfolio).forEach(([symbol, quantity]) => {
       if (stockData[symbol]) {
@@ -385,7 +413,7 @@ const MainApp = ({ user, signOut }) => {
     stock.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const resetAllData = () => {
+  const resetAllData = async () => {
     if (window.confirm('Are you sure you want to reset all data? This will clear your portfolio, transactions, and reset your cash to $10,000.')) {
       const defaultUser = {
         name: user.attributes?.email || user.username,
@@ -398,9 +426,12 @@ const MainApp = ({ user, signOut }) => {
       setPortfolio({});
       setTransactions([]);
       
-      localStorage.removeItem(`stockSim_${userId}_user`);
-      localStorage.removeItem(`stockSim_${userId}_portfolio`);
-      localStorage.removeItem(`stockSim_${userId}_transactions`);
+      // Save reset data to DynamoDB
+      await Promise.all([
+        saveUserData(userId, 'USER_INFO', defaultUser),
+        saveUserData(userId, 'PORTFOLIO', {}),
+        saveUserData(userId, 'TRANSACTIONS', [])
+      ]);
       
       alert('All data has been reset!');
     }
@@ -454,6 +485,18 @@ const MainApp = ({ user, signOut }) => {
       console.error('Error signing out:', error);
     }
   };
+
+  // Show loading screen while fetching user data
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader className="animate-spin text-blue-600 mx-auto mb-4" size={48} />
+          <p className="text-gray-600">Loading your portfolio...</p>
+        </div>
+      </div>
+    );
+  }
 
   const renderHome = () => (
     <div className="space-y-6">

@@ -2,7 +2,7 @@
   "name": "stock-application",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://rahulpallath.github.io/stock-application",
+  "homepage": "http://.",
   "dependencies": {
     "@aws-amplify/ui-react": "^6.11.2",
     "@testing-library/dom": "^10.4.0",
@@ -10,6 +10,7 @@
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
     "aws-amplify": "^6.15.1",
+    "aws-sdk": "^2.1692.0",
     "axios": "^1.10.0",
     "lucide-react": "^0.517.0",
     "oidc-client-ts": "^3.3.0",
@@ -47,5 +48,17 @@
   },
   "devDependencies": {
     "gh-pages": "^6.3.0"
+  },
+  "description": "This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rahulpallath/stock-application.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Rahulpallath/stock-application/issues"
   }
 }

@@ -9,7 +9,8 @@
       "UnauthRoleName": "amplify-stocktradingsimulato-dev-0157e-unauthRole",
       "StackName": "amplify-stocktradingsimulato-dev-0157e",
       "StackId": "arn:aws:cloudformation:us-east-2:564714323613:stack/amplify-stocktradingsimulato-dev-0157e/5f8a1030-4cc4-11f0-bfa6-060408d16c05",
-      "AmplifyAppId": "dfi69wt422dkk"
+      "AmplifyAppId": "dfi69wt422dkk",
+      "APIGatewayAuthURL": "https://s3.amazonaws.com/amplify-stocktradingsimulato-dev-0157e-deployment/amplify-cfn-templates/api/APIGatewayAuthStack.json"
     },
     "categories": {
       "auth": {
@@ -20,6 +21,18 @@
           "appId": "dfi69wt422dkk",
           "type": "manual"
         }
+      },
+      "storage": {
+        "stocktradingdb": {}
+      },
+      "function": {
+        "stocktradingfunction": {
+          "deploymentBucketName": "amplify-stocktradingsimulato-dev-0157e-deployment",
+          "s3Key": "amplify-builds/stocktradingfunction-526f6f42555a4a786a76-build.zip"
+        }
+      },
+      "api": {
+        "stocktradingapi": {}
       }
     }
   }
