@@ -1,63 +1,83 @@
-const AWS = require("aws-sdk");
-const docClient = new AWS.DynamoDB.DocumentClient();
+const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+const {
+  DynamoDBDocumentClient,
+  PutCommand,
+  GetCommand,
+} = require("@aws-sdk/lib-dynamodb");
+
+const client = new DynamoDBClient();
+const docClient = DynamoDBDocumentClient.from(client);
 const tableName = process.env.STORAGE_STOCKTRADINGDB_NAME;
 
 exports.handler = async (event) => {
-  const userId = event.requestContext.authorizer.claims.email;
+  console.log("Received event:", JSON.stringify(event));
+
+  // Extract user ID from Cognito identity or fallback
+  const userId =
+    event.requestContext?.authorizer?.claims?.email || "anonymous_user";
 
   if (event.httpMethod === "POST") {
-    const { dataType, data } = JSON.parse(event.body);
-
-    const params = {
-      TableName: tableName,
-      Item: {
-        userId,
-        dataType,
-        data,
-      },
-    };
-
     try {
-      await docClient.put(params).promise();
+      const { dataType, data } = JSON.parse(event.body);
+
+      const params = new PutCommand({
+        TableName: tableName,
+        Item: {
+          userId,
+          dataType,
+          data,
+        },
+      });
+
+      await docClient.send(params);
+
       return {
         statusCode: 200,
-        body: JSON.stringify({ message: "Saved successfully" }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "Data saved successfully." }),
       };
-    } catch (err) {
+    } catch (error) {
+      console.error("POST error:", error);
       return {
         statusCode: 500,
-        body: JSON.stringify({ error: err.message }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ error: error.message }),
       };
     }
   }
 
   if (event.httpMethod === "GET") {
-    const { dataType } = event.queryStringParameters;
-
-    const params = {
-      TableName: tableName,
-      Key: {
-        userId,
-        dataType,
-      },
-    };
-
     try {
-      const result = await docClient.get(params).promise();
+      const { dataType } = event.queryStringParameters;
+
+      const params = new GetCommand({
+        TableName: tableName,
+        Key: {
+          userId,
+          dataType,
+        },
+      });
+
+      const result = await docClient.send(params);
+
       return {
         statusCode: 200,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(result.Item ? result.Item.data : null),
       };
-    } catch (err) {
+    } catch (error) {
+      console.error("GET error:", error);
       return {
         statusCode: 500,
-        body: JSON.stringify({ error: err.message }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ error: error.message }),
       };
     }
   }
 
   return {
     statusCode: 400,
-    body: JSON.stringify({ error: "Unsupported method" }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ error: "Unsupported HTTP method" }),
   };
 };
