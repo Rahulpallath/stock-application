@@ -1,3 +1,23 @@
 {
-  "lambdaLayers": []
+  "permissions": {
+    "storage": {
+      "stocktradingdb": [
+        "create",
+        "read",
+        "update",
+        "delete"
+      ]
+    }
+  },
+  "dependsOn": [
+    {
+      "category": "storage",
+      "resourceName": "storagestocktradingdb",
+      "attributes": [
+        "Name",
+        "Arn",
+        "StreamArn"
+      ]
+    }
+  ]
 }
