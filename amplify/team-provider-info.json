@@ -28,7 +28,7 @@
       "function": {
         "stocktradingfunction": {
           "deploymentBucketName": "amplify-stocktradingsimulato-dev-0157e-deployment",
-          "s3Key": "amplify-builds/stocktradingfunction-6e5035506b5672363535-build.zip"
+          "s3Key": "amplify-builds/stocktradingfunction-4233367539346657362f-build.zip"
         }
       },
       "api": {

@@ -88,6 +88,30 @@ const MainApp = ({ user }) => {
     }));
   }, [portfolio, stockData, portfolioLoading]);
 
+  // Real-time portfolio updates when stock prices change (for simulation)
+  useEffect(() => {
+    if (!userData || portfolioLoading || Object.keys(portfolio).length === 0) return;
+
+    const updateInterval = setInterval(() => {
+      const newPortfolioValue = getPortfolioValue();
+      
+      setUserData(prev => {
+        // Only update if there's a meaningful change (avoid constant re-renders)
+        const priceDiff = Math.abs(newPortfolioValue - prev.portfolioValue);
+        if (priceDiff > 0.01) {
+          return {
+            ...prev,
+            portfolioValue: newPortfolioValue,
+            totalValue: prev.cash + newPortfolioValue
+          };
+        }
+        return prev;
+      });
+    }, 3000); // Update portfolio value every 3 seconds
+
+    return () => clearInterval(updateInterval);
+  }, [portfolio, stockData, portfolioLoading, userData?.cash]);
+
   // Trading functions
   const handleBuySell = (symbol, quantity, orderType) => {
     if (!stockData[symbol] || !userData) return false;

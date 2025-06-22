@@ -1,230 +1,174 @@
 // src/hooks/useStockData.js
-import { useState, useEffect } from 'react';
-import { POPULAR_STOCKS, FINNHUB_API_KEY, FINNHUB_BASE_URL } from '../utils/constants';
+import { useState, useEffect, useRef } from 'react';
+import { hybridStockService } from '../services/hybridStockService';
 
 export const useStockData = () => {
   const [stockData, setStockData] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [apiKeyMissing, setApiKeyMissing] = useState(false);
+  const [dataInfo, setDataInfo] = useState(null);
+  const [marketStatus, setMarketStatus] = useState(null);
+  
+  const updateIntervalRef = useRef(null);
+  const initializationRef = useRef(false);
 
-  // Rate limiting state
-  const [isRateLimited, setIsRateLimited] = useState(false);
-
-  const fetchStockQuote = async (symbol, retryCount = 0) => {
-    try {
-      const response = await fetch(
-        `${FINNHUB_BASE_URL}/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`
-      );
-      
-      // Handle rate limiting (429)
-      if (response.status === 429) {
-        console.warn(`Rate limited for ${symbol}. Attempt ${retryCount + 1}`);
-        setIsRateLimited(true);
-        
-        if (retryCount < 3) {
-          // Exponential backoff: wait 2^retryCount seconds
-          const delay = Math.pow(2, retryCount) * 2000;
-          console.log(`Retrying ${symbol} in ${delay/1000} seconds...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          return fetchStockQuote(symbol, retryCount + 1);
-        } else {
-          throw new Error('Rate limit exceeded after retries');
-        }
-      }
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: Failed to fetch stock data`);
-      }
-      
-      const data = await response.json();
-      
-      // Check for valid data
-      if (data.c === 0 && data.h === 0 && data.l === 0) {
-        throw new Error('Invalid API response - no data returned');
-      }
-
-      // Reset rate limit flag on success
-      setIsRateLimited(false);
-
-      return {
-        currentPrice: data.c,
-        change: data.d,
-        percentChange: data.dp,
-        highPrice: data.h,
-        lowPrice: data.l,
-        openPrice: data.o,
-        previousClose: data.pc,
-        timestamp: data.t
-      };
-    } catch (error) {
-      console.error(`Error fetching quote for ${symbol}:`, error.message);
-      throw error;
-    }
-  };
-
-  const generateMockData = () => {
-    const mockData = {};
-    POPULAR_STOCKS.forEach(stock => {
-      const basePrice = 50 + Math.random() * 450;
-      const changePercent = (Math.random() - 0.5) * 0.1; // ±5% change
-      const change = basePrice * changePercent;
-      
-      mockData[stock.symbol] = {
-        symbol: stock.symbol,
-        name: stock.name,
-        price: basePrice,
-        previousClose: basePrice - change,
-        change: change,
-        changePercent: changePercent * 100,
-        high: basePrice * 1.02,
-        low: basePrice * 0.98,
-        open: basePrice * (1 + (Math.random() - 0.5) * 0.02),
-        volume: Math.floor(Math.random() * 50000000) + 1000000,
-        marketCap: Math.floor(basePrice * (Math.random() * 100 + 10) * 1000000000)
-      };
-    });
-    return mockData;
-  };
-
+  // Initialize the hybrid system (real data once, then simulation)
   const initializeStockData = async () => {
+    if (initializationRef.current) return;
+    initializationRef.current = true;
+
     setLoading(true);
     setError(null);
-    setIsRateLimited(false);
-
-    if (!FINNHUB_API_KEY || FINNHUB_API_KEY === 'YOUR_FINNHUB_API_KEY') {
-      console.log('Using mock data - no API key provided');
-      setApiKeyMissing(true);
-      setStockData(generateMockData());
-      setLoading(false);
-      return;
-    }
-
+    
     try {
-      const stockInfo = {};
+      console.log('🚀 Starting hybrid stock data system...');
       
-      // Load stocks in smaller batches to avoid rate limiting
-      const BATCH_SIZE = 5;
-      const BATCH_DELAY = 3000; // 3 seconds between batches
+      // Initialize hybrid system (fetches real data once, then starts simulation)
+      const result = await hybridStockService.initializeHybridSystem();
       
-      console.log(`Loading ${POPULAR_STOCKS.length} stocks in batches of ${BATCH_SIZE}...`);
-      
-      for (let batchStart = 0; batchStart < POPULAR_STOCKS.length; batchStart += BATCH_SIZE) {
-        const batch = POPULAR_STOCKS.slice(batchStart, batchStart + BATCH_SIZE);
-        console.log(`Loading batch ${Math.floor(batchStart/BATCH_SIZE) + 1}: ${batch.map(s => s.symbol).join(', ')}`);
+      if (result.success) {
+        // Get initial stock data from simulation (now based on real data if available)
+        const initialStockData = hybridStockService.getCurrentStockData();
+        setStockData(initialStockData);
         
-        // Process batch with individual delays
-        for (let i = 0; i < batch.length; i++) {
-          const stock = batch[i];
-          
-          try {
-            // Add delay between individual requests (1 second)
-            if (batchStart > 0 || i > 0) {
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-            
-            const quote = await fetchStockQuote(stock.symbol);
-            
-            stockInfo[stock.symbol] = {
-              symbol: stock.symbol,
-              name: stock.name,
-              price: quote.currentPrice,
-              previousClose: quote.previousClose,
-              change: quote.change,
-              changePercent: quote.percentChange,
-              high: quote.highPrice,
-              low: quote.lowPrice,
-              open: quote.openPrice,
-              timestamp: quote.timestamp
-            };
-            
-            // Update state incrementally so user sees progress
-            setStockData(prev => ({ ...prev, ...{[stock.symbol]: stockInfo[stock.symbol]} }));
-            
-          } catch (error) {
-            console.error(`Failed to fetch ${stock.symbol}, using fallback data:`, error.message);
-            
-            // Use fallback data for failed requests
-            const fallbackPrice = 100 + Math.random() * 400;
-            const fallbackChange = (Math.random() - 0.5) * 10;
-            
-            stockInfo[stock.symbol] = {
-              symbol: stock.symbol,
-              name: stock.name,
-              price: fallbackPrice,
-              previousClose: fallbackPrice - fallbackChange,
-              change: fallbackChange,
-              changePercent: (fallbackChange / (fallbackPrice - fallbackChange)) * 100,
-              high: fallbackPrice * 1.02,
-              low: fallbackPrice * 0.98,
-              open: fallbackPrice * 0.99,
-              timestamp: Date.now() / 1000
-            };
-            
-            setStockData(prev => ({ ...prev, ...{[stock.symbol]: stockInfo[stock.symbol]} }));
-          }
-        }
+        // Get market status
+        const status = hybridStockService.getMarketStatus();
+        setMarketStatus(status);
         
-        // Longer delay between batches
-        if (batchStart + BATCH_SIZE < POPULAR_STOCKS.length) {
-          console.log(`Waiting ${BATCH_DELAY/1000} seconds before next batch...`);
-          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
-        }
+        // Set data info
+        setDataInfo({
+          hasRealData: result.hasRealBase,
+          realDataCount: result.realDataCount,
+          totalStocks: result.totalStocks,
+          useSimulation: true,
+          message: result.hasRealBase 
+            ? `Started with real prices for ${result.realDataCount} stocks, now using live simulation`
+            : 'Using pure simulation mode - no real data available'
+        });
+        
+        console.log('✅ Hybrid system initialized:', {
+          realDataCount: result.realDataCount,
+          totalStocks: result.totalStocks,
+          hasRealBase: result.hasRealBase
+        });
+        
+      } else {
+        throw new Error('Failed to initialize hybrid system');
       }
       
-      console.log(`Successfully loaded ${Object.keys(stockInfo).length} stocks`);
-      setLoading(false);
-      
-    } catch (error) {
-      console.error('Failed to load stock data:', error);
-      setError('Failed to load stock data. Using fallback data.');
-      
-      // Fall back to mock data on complete failure
-      setStockData(generateMockData());
-      setApiKeyMissing(true);
+    } catch (err) {
+      console.error('❌ Failed to initialize stock data:', err);
+      setError('Failed to load stock data. Please refresh the page.');
+    } finally {
       setLoading(false);
     }
   };
 
-  const simulatePriceUpdates = () => {
-    const interval = setInterval(() => {
-      setStockData(prev => {
-        const newData = { ...prev };
-        Object.keys(newData).forEach(symbol => {
-          const stock = newData[symbol];
-          // Smaller price movements for more realistic simulation
-          const changePercent = (Math.random() - 0.5) * 0.01; // ±0.5% change
-          const newPrice = stock.price * (1 + changePercent);
-          
-          newData[symbol] = {
-            ...stock,
-            price: newPrice,
-            change: newPrice - stock.previousClose,
-            changePercent: ((newPrice - stock.previousClose) / stock.previousClose) * 100,
-            timestamp: Date.now() / 1000
-          };
-        });
-        return newData;
-      });
-    }, 5000); // Update every 5 seconds
+  // Start real-time simulation updates
+  const startSimulationUpdates = () => {
+    if (updateIntervalRef.current) {
+      clearInterval(updateIntervalRef.current);
+    }
 
-    return () => clearInterval(interval);
+    updateIntervalRef.current = setInterval(() => {
+      try {
+        // Get updated data from simulation
+        const updatedData = hybridStockService.getCurrentStockData();
+        setStockData(updatedData);
+        
+        // Update market status
+        const status = hybridStockService.getMarketStatus();
+        setMarketStatus(status);
+        
+        // Update data info
+        const info = hybridStockService.getDataInfo();
+        setDataInfo(prev => ({
+          ...prev,
+          ...info,
+          lastUpdate: new Date().toLocaleTimeString()
+        }));
+        
+      } catch (error) {
+        console.error('Error updating stock data:', error);
+      }
+    }, 2000); // Update every 2 seconds
   };
 
+  // Initialize on mount
   useEffect(() => {
     initializeStockData();
+    
+    return () => {
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current);
+      }
+    };
   }, []);
 
+  // Start simulation updates after data is loaded
   useEffect(() => {
-    // Only simulate if using mock data or fallback data
-    if (apiKeyMissing || error) {
-      const cleanup = simulatePriceUpdates();
-      return cleanup;
+    if (!loading && Object.keys(stockData).length > 0) {
+      console.log('📊 Starting real-time simulation updates...');
+      startSimulationUpdates();
     }
-  }, [apiKeyMissing, error]);
 
-  const refreshStockData = () => {
-    initializeStockData();
+    return () => {
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current);
+      }
+    };
+  }, [loading]);
+
+  // Handle visibility change (pause/resume updates when tab is hidden/visible)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Tab is hidden - stop updates to save resources
+        if (updateIntervalRef.current) {
+          clearInterval(updateIntervalRef.current);
+          updateIntervalRef.current = null;
+          console.log('⏸️ Paused updates (tab hidden)');
+        }
+      } else {
+        // Tab is visible - resume updates
+        if (!updateIntervalRef.current && !loading) {
+          console.log('▶️ Resumed updates (tab visible)');
+          startSimulationUpdates();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [loading]);
+
+  // Refresh stock data (force new real data fetch)
+  const refreshStockData = async () => {
+    setLoading(true);
+    initializationRef.current = false;
+    
+    try {
+      const result = await hybridStockService.forceRefresh();
+      const refreshedData = hybridStockService.getCurrentStockData();
+      setStockData(refreshedData);
+      
+      setDataInfo({
+        hasRealData: result.hasRealBase,
+        realDataCount: result.realDataCount,
+        totalStocks: result.totalStocks,
+        useSimulation: true,
+        message: 'Data refreshed successfully',
+        lastRefresh: new Date().toLocaleTimeString()
+      });
+      
+    } catch (error) {
+      setError('Failed to refresh data');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getStock = (symbol) => {
@@ -240,14 +184,39 @@ export const useStockData = () => {
     );
   };
 
+  const getStockHistory = (symbol) => {
+    return hybridStockService.getStockHistory(symbol);
+  };
+
+  // Get detailed status for debugging/info
+  const getSystemStatus = () => {
+    return {
+      ...dataInfo,
+      marketStatus,
+      stockCount: Object.keys(stockData).length,
+      isLoading: loading,
+      hasError: !!error,
+      updateInterval: updateIntervalRef.current ? 'Active' : 'Paused'
+    };
+  };
+
   return {
+    // Data
     stockData,
     loading,
     error,
-    apiKeyMissing,
-    isRateLimited,
+    
+    // Status and info
+    marketStatus,
+    dataInfo,
+    useSimulation: true, // Always true in hybrid mode
+    apiKeyMissing: !dataInfo?.hasRealData, // Show warning if no real data
+    
+    // Functions
     refreshStockData,
     getStock,
-    searchStocks
+    searchStocks,
+    getStockHistory,
+    getSystemStatus
   };
 };

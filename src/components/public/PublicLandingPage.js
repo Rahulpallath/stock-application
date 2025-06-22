@@ -6,9 +6,10 @@ import LiveMarketData from './LiveMarketData';
 import EducationalHub from './EducationalHub';
 import FeaturesPreview from './FeaturesPreview';
 import StockChart from './StockChart';
+import DataSourceIndicator from '../common/DataSourceIndicator';
 
 const PublicLandingPage = ({ onSignIn }) => {
-  const { stockData, loading, apiKeyMissing } = useStockData();
+  const { stockData, loading, dataInfo, refreshStockData } = useStockData();
   const [selectedStock, setSelectedStock] = useState('AAPL');
 
   const features = [
@@ -46,6 +47,15 @@ const PublicLandingPage = ({ onSignIn }) => {
             </div>
             
             <div className="flex items-center space-x-4">
+              {/* Data Source Indicator */}
+              {dataInfo && (
+                <DataSourceIndicator 
+                  dataInfo={dataInfo} 
+                  onRefresh={refreshStockData}
+                  compact={true}
+                />
+              )}
+              
               <button
                 onClick={onSignIn}
                 className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
@@ -84,6 +94,23 @@ const PublicLandingPage = ({ onSignIn }) => {
                   <span>Join 10,000+ active traders</span>
                 </div>
               </div>
+              
+              {/* Data Status for Hero */}
+              {dataInfo && (
+                <div className="mt-6 p-4 bg-white/10 backdrop-blur-sm rounded-lg">
+                  <div className="text-sm text-blue-100">
+                    {dataInfo.hasRealData ? (
+                      <>
+                        ✅ <strong>Live with real prices:</strong> Started with authentic market data for {dataInfo.realDataCount} stocks
+                      </>
+                    ) : (
+                      <>
+                        🎮 <strong>Simulation mode:</strong> Realistic price movements based on market patterns
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6">
@@ -98,6 +125,19 @@ const PublicLandingPage = ({ onSignIn }) => {
         </div>
       </section>
 
+      {/* Data Source Info Section */}
+      {dataInfo && (
+        <section className="py-8 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <DataSourceIndicator 
+              dataInfo={dataInfo} 
+              onRefresh={refreshStockData}
+              compact={false}
+            />
+          </div>
+        </section>
+      )}
+
       {/* Live Market Data */}
       <section className="py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -106,7 +146,10 @@ const PublicLandingPage = ({ onSignIn }) => {
               Live Market Data
             </h2>
             <p className="text-xl text-gray-600">
-              Real-time stock prices and market movements
+              {dataInfo?.hasRealData 
+                ? `Real-time prices starting from authentic market data (${dataInfo.realDataCount} stocks)`
+                : 'Real-time stock simulation with authentic market movements'
+              }
             </p>
           </div>
           
@@ -181,6 +224,16 @@ const PublicLandingPage = ({ onSignIn }) => {
           <p className="mt-4 text-blue-200 text-sm">
             No credit card required • Start with $10,000 virtual money
           </p>
+          
+          {dataInfo && (
+            <div className="mt-6 text-sm text-blue-200">
+              {dataInfo.hasRealData ? (
+                `🚀 Experience real market movements with ${dataInfo.realDataCount} authentic stock prices`
+              ) : (
+                '🎮 Realistic market simulation - perfect for learning without limits'
+              )}
+            </div>
+          )}
         </div>
       </section>
 
@@ -196,6 +249,11 @@ const PublicLandingPage = ({ onSignIn }) => {
               <p className="text-gray-400">
                 Learn stock trading through simulation with real market data.
               </p>
+              {dataInfo && (
+                <div className="mt-3 text-sm text-gray-400">
+                  {dataInfo.hasRealData ? 'Powered by real market data' : 'Realistic market simulation'}
+                </div>
+              )}
             </div>
             
             <div>

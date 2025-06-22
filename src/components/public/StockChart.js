@@ -2,38 +2,54 @@
 import React, { useMemo } from 'react';
 import { TrendingUp, TrendingDown, BarChart3, Loader } from 'lucide-react';
 
-const StockChart = ({ stock, loading, compact = false }) => {
-  // Generate sample chart data for demonstration
+const StockChart = ({ stock, loading, compact = false, getStockHistory = null, useSimulation = false }) => {
+  
+  // Get price history for the chart
   const chartData = useMemo(() => {
     if (!stock) return [];
     
-    // Generate 30 days of sample price data
-    const data = [];
-    const basePrice = stock.previousClose || stock.price;
-    let currentPrice = basePrice;
+    if (useSimulation && getStockHistory) {
+      // Use real simulation history if available
+      const history = getStockHistory(stock.symbol);
+      if (history && history.length > 0) {
+        return history.map((point, index) => ({
+          date: new Date(point.time).toISOString().split('T')[0],
+          price: point.price,
+          volume: Math.floor(Math.random() * 50000000) + 1000000,
+          index
+        }));
+      }
+    }
     
-    for (let i = 29; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
+    // Fallback: Generate chart data based on current price
+    const data = [];
+    const currentPrice = stock.price;
+    const basePrice = stock.previousClose || currentPrice;
+    
+    // Generate 30 data points for the day
+    for (let i = 0; i < 30; i++) {
+      const progress = i / 29; // 0 to 1
+      const timeVariation = Math.sin(progress * Math.PI * 2) * 0.01; // Sine wave variation
+      const randomNoise = (Math.random() - 0.5) * 0.02; // Random noise
+      const trendTowardsCurrent = progress * ((currentPrice - basePrice) / basePrice);
       
-      // Add some random price movement
-      const change = (Math.random() - 0.5) * 0.05; // ±2.5% daily change
-      currentPrice = currentPrice * (1 + change);
+      const price = basePrice * (1 + trendTowardsCurrent + timeVariation + randomNoise);
       
       data.push({
-        date: date.toISOString().split('T')[0],
-        price: currentPrice,
-        volume: Math.floor(Math.random() * 50000000) + 1000000
+        date: `Point ${i + 1}`,
+        price: Math.max(0.01, price),
+        volume: Math.floor(Math.random() * 50000000) + 1000000,
+        index: i
       });
     }
     
-    // Set the last data point to current stock price
+    // Ensure last point matches current price
     if (data.length > 0) {
-      data[data.length - 1].price = stock.price;
+      data[data.length - 1].price = currentPrice;
     }
     
     return data;
-  }, [stock]);
+  }, [stock, useSimulation, getStockHistory]);
 
   if (loading) {
     return (
@@ -63,15 +79,20 @@ const StockChart = ({ stock, loading, compact = false }) => {
   const maxPrice = Math.max(...prices);
   const priceRange = maxPrice - minPrice;
 
-  // Generate SVG path
-  const pathData = chartData.map((point, index) => {
-    const x = (index / (chartData.length - 1)) * 100;
-    const y = 100 - ((point.price - minPrice) / priceRange) * 100;
-    return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-  }).join(' ');
+  // Generate SVG path only if we have valid data
+  let pathData = '';
+  let areaData = '';
+  
+  if (chartData.length > 0 && priceRange > 0) {
+    pathData = chartData.map((point, index) => {
+      const x = (index / (chartData.length - 1)) * 100;
+      const y = 100 - ((point.price - minPrice) / priceRange) * 100;
+      return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
+    }).join(' ');
 
-  // Generate area path for gradient fill
-  const areaData = `${pathData} L 100 100 L 0 100 Z`;
+    // Generate area path for gradient fill
+    areaData = `${pathData} L 100 100 L 0 100 Z`;
+  }
 
   return (
     <div className="space-y-4">
@@ -109,34 +130,38 @@ const StockChart = ({ stock, loading, compact = false }) => {
         >
           {/* Grid lines */}
           <defs>
-            <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
+            <pattern id={`grid-${stock.symbol}`} width="10" height="10" patternUnits="userSpaceOnUse">
               <path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="0.5"/>
             </pattern>
-            <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <linearGradient id={`areaGradient-${stock.symbol}`} x1="0%" y1="0%" x2="0%" y2="100%">
               <stop offset="0%" stopColor={chartColor} stopOpacity="0.3"/>
               <stop offset="100%" stopColor={chartColor} stopOpacity="0.1"/>
             </linearGradient>
           </defs>
           
-          <rect width="100" height="100" fill="url(#grid)" />
+          <rect width="100" height="100" fill={`url(#grid-${stock.symbol})`} />
           
           {/* Area fill */}
-          <path
-            d={areaData}
-            fill="url(#areaGradient)"
-          />
+          {areaData && (
+            <path
+              d={areaData}
+              fill={`url(#areaGradient-${stock.symbol})`}
+            />
+          )}
           
           {/* Price line */}
-          <path
-            d={pathData}
-            fill="none"
-            stroke={chartColor}
-            strokeWidth="0.8"
-            vectorEffect="non-scaling-stroke"
-          />
+          {pathData && (
+            <path
+              d={pathData}
+              fill="none"
+              stroke={chartColor}
+              strokeWidth="0.8"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
           
           {/* Data points */}
-          {!compact && chartData.map((point, index) => {
+          {!compact && chartData.length > 0 && priceRange > 0 && chartData.map((point, index) => {
             const x = (index / (chartData.length - 1)) * 100;
             const y = 100 - ((point.price - minPrice) / priceRange) * 100;
             return (
@@ -159,6 +184,14 @@ const StockChart = ({ stock, loading, compact = false }) => {
         <div className="absolute bottom-2 left-2 text-xs text-white/80 bg-black/20 px-2 py-1 rounded">
           Low: ${minPrice.toFixed(2)}
         </div>
+        
+        {/* Live indicator */}
+        {useSimulation && (
+          <div className="absolute top-2 right-2 flex items-center text-xs text-white/80 bg-black/20 px-2 py-1 rounded">
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mr-1"></div>
+            Live Simulation
+          </div>
+        )}
       </div>
 
       {/* Chart Stats */}
@@ -166,15 +199,15 @@ const StockChart = ({ stock, loading, compact = false }) => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-white">
           <div className="bg-white/10 rounded-lg p-3">
             <div className="text-xs text-blue-200">Open</div>
-            <div className="font-semibold">${stock.open?.toFixed(2) || 'N/A'}</div>
+            <div className="font-semibold">${stock.open?.toFixed(2) || stock.previousClose?.toFixed(2) || 'N/A'}</div>
           </div>
           <div className="bg-white/10 rounded-lg p-3">
             <div className="text-xs text-blue-200">High</div>
-            <div className="font-semibold">${stock.high?.toFixed(2) || 'N/A'}</div>
+            <div className="font-semibold">${(stock.high || maxPrice).toFixed(2)}</div>
           </div>
           <div className="bg-white/10 rounded-lg p-3">
             <div className="text-xs text-blue-200">Low</div>
-            <div className="font-semibold">${stock.low?.toFixed(2) || 'N/A'}</div>
+            <div className="font-semibold">${(stock.low || minPrice).toFixed(2)}</div>
           </div>
           <div className="bg-white/10 rounded-lg p-3">
             <div className="text-xs text-blue-200">Volume</div>
@@ -192,14 +225,22 @@ const StockChart = ({ stock, loading, compact = false }) => {
             <button
               key={period}
               className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                period === '1M' 
+                period === '1D' 
                   ? 'bg-white text-blue-600' 
                   : 'bg-white/20 text-white hover:bg-white/30'
               }`}
+              disabled
             >
               {period}
             </button>
           ))}
+        </div>
+      )}
+      
+      {/* Chart info */}
+      {!compact && useSimulation && (
+        <div className="text-center text-white/60 text-sm">
+          📊 Real-time price simulation • Updates every 2 seconds
         </div>
       )}
     </div>

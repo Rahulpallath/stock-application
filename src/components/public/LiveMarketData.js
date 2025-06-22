@@ -2,6 +2,8 @@
 import React, { useState } from 'react';
 import { ArrowUpRight, ArrowDownRight, Loader, Lock, TrendingUp } from 'lucide-react';
 import StockChart from './StockChart';
+import MarketStatus from '../common/MarketStatus';
+import { useStockData } from '../../hooks/useStockData';
 
 const LiveMarketData = ({ 
   stockData, 
@@ -11,6 +13,7 @@ const LiveMarketData = ({
   onSignInPrompt 
 }) => {
   const [hoveredStock, setHoveredStock] = useState(null);
+  const { marketStatus, useSimulation } = useStockData();
 
   if (loading) {
     return (
@@ -25,6 +28,13 @@ const LiveMarketData = ({
 
   return (
     <div className="space-y-8">
+      {/* Market Status */}
+      <MarketStatus 
+        marketStatus={marketStatus} 
+        useSimulation={useSimulation}
+        stockCount={Object.keys(stockData).length}
+      />
+
       {/* Stock Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {topStocks.map(stock => {
@@ -94,7 +104,7 @@ const LiveMarketData = ({
                 <div className="mt-4 flex items-center justify-between">
                   <div className="flex items-center text-xs text-gray-500">
                     <TrendingUp size={14} className="mr-1" />
-                    <span>Real-time data</span>
+                    <span>{useSimulation ? 'Live Simulation' : 'Real-time data'}</span>
                   </div>
                   {isSelected && (
                     <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
@@ -114,7 +124,9 @@ const LiveMarketData = ({
               <h3 className="text-2xl font-bold text-gray-900">
                 {stockData[selectedStock].symbol} - {stockData[selectedStock].name}
               </h3>
-              <p className="text-gray-600">Detailed price chart and analysis</p>
+              <p className="text-gray-600">
+                {useSimulation ? 'Live price simulation with realistic market movements' : 'Real-time price chart and analysis'}
+              </p>
             </div>
             <button
               onClick={onSignInPrompt}
@@ -133,25 +145,36 @@ const LiveMarketData = ({
         </div>
       )}
 
-      {/* Market Status */}
-      <div className="bg-blue-50 rounded-lg p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-blue-900 mb-2">
-              Market Status: Open
-            </h3>
-            <p className="text-blue-700">
-              Real-time data updates every few seconds. Start trading to track your portfolio performance.
-            </p>
-          </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-blue-900">
-              {Object.keys(stockData).length}
+      {/* Simulation Info */}
+      {useSimulation && (
+        <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-6 border border-green-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-green-900 mb-2 flex items-center">
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse mr-2"></div>
+                Live Market Simulation
+              </h3>
+              <p className="text-green-700 text-sm">
+                Experience realistic price movements based on actual market patterns. 
+                Prices update every 2 seconds with authentic volatility and trends.
+              </p>
+              <div className="mt-2 flex items-center text-xs text-green-600">
+                <span>• Market session awareness</span>
+                <span className="mx-2">•</span>
+                <span>• Realistic volume patterns</span>
+                <span className="mx-2">•</span>
+                <span>• Price history tracking</span>
+              </div>
             </div>
-            <div className="text-sm text-blue-700">Stocks Available</div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-green-900">
+                {Object.keys(stockData).length}
+              </div>
+              <div className="text-sm text-green-700">Stocks Simulated</div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
