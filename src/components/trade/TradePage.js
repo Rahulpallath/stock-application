@@ -19,7 +19,9 @@ const TradePage = ({
     <div className="space-y-6">
       <StockSearch searchTerm={searchTerm} onSearchChange={setSearchTerm} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Mobile: Stack layout, Desktop: Side-by-side */}
+      <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-6">
+        {/* Stock List */}
         <div className="lg:col-span-2">
           <StockList
             stockData={stockData}
@@ -30,7 +32,8 @@ const TradePage = ({
           />
         </div>
 
-        <div>
+        {/* Trading Panel */}
+        <div className="lg:col-span-1">
           <TradingPanel
             selectedStock={selectedStock}
             stockData={stockData}

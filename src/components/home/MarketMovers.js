@@ -20,13 +20,15 @@ const MarketMovers = ({ stockData, loading, onStockSelect }) => {
   return (
     <div>
       <h3 className="text-xl font-bold mb-4">Market Movers</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Mobile: 1 column, Tablet: 2 columns, Desktop: 3 columns */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {topStocks.map(stock => (
           <StockCard
             key={stock.symbol}
             stock={stock}
             onClick={() => onStockSelect(stock.symbol)}
-            className="hover:shadow-lg transition-shadow cursor-pointer"
+            className="hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 active:scale-95"
+            showDetails={true}
           />
         ))}
       </div>

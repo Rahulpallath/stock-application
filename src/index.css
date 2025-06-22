@@ -11,3 +11,47 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+/* Mobile-specific improvements */
+@media (max-width: 640px) {
+  /* Ensure proper spacing for bottom navigation */
+  .pb-20 {
+    padding-bottom: 88px !important; /* Account for larger nav */
+  }
+  
+  /* Prevent horizontal scroll on mobile */
+  .overflow-x-hidden {
+    overflow-x: hidden;
+  }
+  
+  /* Better touch targets */
+  button {
+    min-height: 44px;
+  }
+  
+  /* Improve input fields on mobile */
+  input[type="number"], input[type="text"] {
+    font-size: 16px; /* Prevents zoom on iOS */
+  }
+}
+
+/* Safe area support for devices with notches */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Improved scrolling on mobile */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide scrollbars on mobile for cleaner look */
+@media (max-width: 640px) {
+  .overflow-y-auto::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .overflow-y-auto {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

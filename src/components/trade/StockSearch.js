@@ -1,18 +1,28 @@
 // src/components/trade/StockSearch.js
 import React from 'react';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 
 const StockSearch = ({ searchTerm, onSearchChange }) => {
   return (
-    <div className="flex items-center space-x-4">
-      <Search className="text-gray-400" size={20} />
-      <input
-        type="text"
-        placeholder="Search stocks by symbol or company name..."
-        className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors"
-        value={searchTerm}
-        onChange={(e) => onSearchChange(e.target.value)}
-      />
+    <div className="relative">
+      <div className="flex items-center bg-white rounded-lg shadow border border-gray-200 p-4">
+        <Search className="text-gray-400 mr-3" size={20} />
+        <input
+          type="text"
+          placeholder="Search stocks..."
+          className="flex-1 text-lg placeholder-gray-500 outline-none"
+          value={searchTerm}
+          onChange={(e) => onSearchChange(e.target.value)}
+        />
+        {searchTerm && (
+          <button
+            onClick={() => onSearchChange('')}
+            className="ml-2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <X size={20} />
+          </button>
+        )}
+      </div>
     </div>
   );
 };

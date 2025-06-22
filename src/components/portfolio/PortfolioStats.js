@@ -1,6 +1,6 @@
 // src/components/portfolio/PortfolioStats.js
 import React from 'react';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Briefcase, Activity } from 'lucide-react';
 
 const PortfolioStats = ({ stats }) => {
   const {
@@ -15,40 +15,55 @@ const PortfolioStats = ({ stats }) => {
   const isPositive = totalProfit >= 0;
 
   return (
-    <div className="bg-white rounded-lg shadow p-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <p className="text-sm text-gray-600">Portfolio Value</p>
-          <p className="text-2xl font-bold">${portfolioValue.toFixed(2)}</p>
-        </div>
+    <div className="bg-white rounded-lg shadow">
+      {/* Mobile: 2x2 Grid, Desktop: 2x3 Grid */}
+      <div className="p-4">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Portfolio Summary</h3>
         
-        <div>
-          <p className="text-sm text-gray-600">Total P&L</p>
-          <div className="flex items-center">
-            {isPositive ? (
-              <TrendingUp className="text-green-600 mr-1" size={16} />
-            ) : (
-              <TrendingDown className="text-red-600 mr-1" size={16} />
-            )}
-            <div>
-              <p className={`text-lg font-bold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                {isPositive ? '+' : ''}${totalProfit.toFixed(2)}
-              </p>
-              <p className={`text-xs ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                ({totalProfitPercent.toFixed(2)}%)
-              </p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Portfolio Value */}
+          <div className="bg-blue-50 rounded-lg p-4 text-center">
+            <div className="text-xs text-blue-600 mb-1">Portfolio Value</div>
+            <div className="text-lg lg:text-xl font-bold text-blue-900">
+              ${portfolioValue.toLocaleString()}
             </div>
           </div>
-        </div>
-        
-        <div>
-          <p className="text-sm text-gray-600">Holdings</p>
-          <p className="text-lg font-semibold">{holdingsCount}</p>
-        </div>
-        
-        <div>
-          <p className="text-sm text-gray-600">Transactions</p>
-          <p className="text-lg font-semibold">{transactionsCount}</p>
+          
+          {/* Total P&L */}
+          <div className={`rounded-lg p-4 text-center ${isPositive ? 'bg-green-50' : 'bg-red-50'}`}>
+            <div className="flex items-center justify-center mb-1">
+              {isPositive ? (
+                <TrendingUp className="text-green-600 mr-1" size={12} />
+              ) : (
+                <TrendingDown className="text-red-600 mr-1" size={12} />
+              )}
+              <div className="text-xs">Total P&L</div>
+            </div>
+            <div className={`text-lg lg:text-xl font-bold ${isPositive ? 'text-green-900' : 'text-red-900'}`}>
+              {isPositive ? '+' : ''}${totalProfit.toLocaleString()}
+            </div>
+            <div className={`text-xs ${isPositive ? 'text-green-700' : 'text-red-700'}`}>
+              ({totalProfitPercent.toFixed(1)}%)
+            </div>
+          </div>
+          
+          {/* Holdings Count */}
+          <div className="bg-purple-50 rounded-lg p-4 text-center">
+            <div className="flex items-center justify-center mb-1">
+              <Briefcase className="text-purple-600 mr-1" size={12} />
+              <div className="text-xs text-purple-600">Holdings</div>
+            </div>
+            <div className="text-lg lg:text-xl font-bold text-purple-900">{holdingsCount}</div>
+          </div>
+          
+          {/* Transactions Count */}
+          <div className="bg-orange-50 rounded-lg p-4 text-center">
+            <div className="flex items-center justify-center mb-1">
+              <Activity className="text-orange-600 mr-1" size={12} />
+              <div className="text-xs text-orange-600">Trades</div>
+            </div>
+            <div className="text-lg lg:text-xl font-bold text-orange-900">{transactionsCount}</div>
+          </div>
         </div>
       </div>
     </div>

@@ -1,4 +1,3 @@
-// src/hooks/useStockData.js
 import { useState, useEffect, useRef } from 'react';
 import { hybridStockService } from '../services/hybridStockService';
 
@@ -8,9 +7,16 @@ export const useStockData = () => {
   const [error, setError] = useState(null);
   const [dataInfo, setDataInfo] = useState(null);
   const [marketStatus, setMarketStatus] = useState(null);
+  const [initializationComplete, setInitializationComplete] = useState(false);
   
   const updateIntervalRef = useRef(null);
   const initializationRef = useRef(false);
+
+  // Check if API key is properly configured
+  const getApiKeyStatus = () => {
+    const apiKey = process.env.REACT_APP_FINNHUB_API_KEY;
+    return !apiKey || apiKey === 'YOUR_FINNHUB_API_KEY' || apiKey.trim() === '';
+  };
 
   // Initialize the hybrid system (real data once, then simulation)
   const initializeStockData = async () => {
@@ -43,7 +49,8 @@ export const useStockData = () => {
           useSimulation: true,
           message: result.hasRealBase 
             ? `Started with real prices for ${result.realDataCount} stocks, now using live simulation`
-            : 'Using pure simulation mode - no real data available'
+            : 'Using pure simulation mode - no real data available',
+          fetchAttempted: true // Key flag to indicate we've tried fetching
         });
         
         console.log('✅ Hybrid system initialized:', {
@@ -59,8 +66,19 @@ export const useStockData = () => {
     } catch (err) {
       console.error('❌ Failed to initialize stock data:', err);
       setError('Failed to load stock data. Please refresh the page.');
+      
+      // Set dataInfo even on error so we don't show warning prematurely
+      setDataInfo({
+        hasRealData: false,
+        realDataCount: 0,
+        totalStocks: 0,
+        useSimulation: true,
+        message: 'Error loading data - using simulation only',
+        fetchAttempted: true
+      });
     } finally {
       setLoading(false);
+      setInitializationComplete(true);
     }
   };
 
@@ -85,7 +103,8 @@ export const useStockData = () => {
         setDataInfo(prev => ({
           ...prev,
           ...info,
-          lastUpdate: new Date().toLocaleTimeString()
+          lastUpdate: new Date().toLocaleTimeString(),
+          fetchAttempted: true
         }));
         
       } catch (error) {
@@ -161,7 +180,8 @@ export const useStockData = () => {
         totalStocks: result.totalStocks,
         useSimulation: true,
         message: 'Data refreshed successfully',
-        lastRefresh: new Date().toLocaleTimeString()
+        lastRefresh: new Date().toLocaleTimeString(),
+        fetchAttempted: true
       });
       
     } catch (error) {
@@ -210,7 +230,8 @@ export const useStockData = () => {
     marketStatus,
     dataInfo,
     useSimulation: true, // Always true in hybrid mode
-    apiKeyMissing: !dataInfo?.hasRealData, // Show warning if no real data
+    // Only show API warning if initialization is complete and no real data AND no API key
+    apiKeyMissing: initializationComplete && !dataInfo?.hasRealData && getApiKeyStatus(),
     
     // Functions
     refreshStockData,

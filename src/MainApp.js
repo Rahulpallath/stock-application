@@ -31,7 +31,7 @@ const MainApp = ({ user }) => {
 
   // Hooks
   const { saveUserData, getUserData } = useApi();
-  const { stockData, loading: stockLoading, apiKeyMissing } = useStockData();
+  const { stockData, loading: stockLoading, apiKeyMissing, dataInfo } = useStockData();
   const {
     portfolio,
     transactions,
@@ -211,12 +211,27 @@ const MainApp = ({ user }) => {
   };
 
   const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
+  try {
+    // Import signOut directly from aws-amplify
+    const { signOut: amplifySignOut } = await import('aws-amplify/auth');
+    
+    // Sign out from Amplify
+    await amplifySignOut();
+    
+    // Clear any cached data
+    localStorage.removeItem('stocksim_real_data_cache');
+    localStorage.removeItem('stocksim_cache_time');
+    
+    // Force page refresh to ensure clean state and redirect
+    window.location.href = '/';
+    
+  } catch (error) {
+    console.error('Error signing out:', error);
+    
+    // Even if signOut fails, force redirect to clear state
+    window.location.href = '/';
+  }
+};
 
   // Show loading screen while data is loading
   if (isLoading || portfolioLoading) {
@@ -234,6 +249,7 @@ const MainApp = ({ user }) => {
             loading={stockLoading}
             apiKeyMissing={apiKeyMissing}
             onStockSelect={handleStockSelect}
+            dataInfo={dataInfo} // Add this line
           />
         );
       

@@ -91,7 +91,7 @@ const PublicLandingPage = ({ onSignIn }) => {
                 </button>
                 <div className="flex items-center text-blue-200">
                   <Users size={20} className="mr-2" />
-                  <span>Join 10,000+ active traders</span>
+                  <span>Join now to be an active trader</span>
                 </div>
               </div>
               

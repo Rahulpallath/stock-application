@@ -1,4 +1,3 @@
-// src/App.js
 import React, { useState, useEffect } from 'react';
 import { Amplify } from 'aws-amplify';
 import { getCurrentUser, signOut } from 'aws-amplify/auth';
@@ -37,10 +36,17 @@ function App() {
   const handleSignOut = async () => {
     try {
       await signOut();
+      // Force immediate state update
       setUser(null);
       setShowAuth(false);
+      // Optional: Clear any cached data
+      localStorage.removeItem('stocksim_real_data_cache');
+      localStorage.removeItem('stocksim_cache_time');
     } catch (error) {
       console.error('Error signing out:', error);
+      // Even if signOut fails, clear local state
+      setUser(null);
+      setShowAuth(false);
     }
   };
 
